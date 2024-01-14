@@ -29,10 +29,6 @@ impl ChaumPedersen {
     }
 }
 
-pub fn generate_random(limit: &BigUint) -> BigUint {
-    return thread_rng().gen_biguint_below(limit)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -105,7 +101,7 @@ mod tests {
     }
 
     #[test]
-    fn success_on_actual_prime_order_group() {
+    fn success_on_rfc_5114_suggested_group() {
         // Values taken from https://datatracker.ietf.org/doc/html/rfc5114#section-2.1
         let p = BigUint::from_str_radix(
             "B10B8F96A080E01DDE92DE5EAE5D54EC52C99FBCFB06A3C69A6A9DCA52D23B61\
@@ -139,5 +135,9 @@ mod tests {
         let s = cp.solve(&k, &c, &x);
         let is_verified = cp.verify(&r1, &r2, &y1, &y2, &c, &s);
         assert!(is_verified);
+    }
+
+    fn generate_random(limit: &BigUint) -> BigUint {
+        return thread_rng().gen_biguint_below(limit)
     }
 }
