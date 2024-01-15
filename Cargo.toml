@@ -12,6 +12,8 @@ tonic = "0.10"
 prost = "0.12"
 tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
 uuid = { version = "1.6", features = ["v4"] }
+text_io = "0.1"
+rpassword = "7.3"
 
 [build-dependencies]
 tonic-build = "0.10"

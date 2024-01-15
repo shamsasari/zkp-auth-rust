@@ -1,13 +1,18 @@
 syntax = "proto3";
 package zkp_auth;
 
+
 /*
- * Prover registers in the sender sending y1 and y2
+ * Prover registers with the verifier by sending across the public parameters and its y1 and y2 values.
  */
 message RegisterRequest {
     string user = 1;
-    bytes y1 = 2;
-    bytes y2 = 3;
+    bytes p = 2;
+    bytes q = 3;
+    bytes alpha = 4;
+    bytes beta = 5;
+    bytes y1 = 6;
+    bytes y2 = 7;
 }
 
 message RegisterResponse {
