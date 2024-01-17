@@ -1,3 +1,5 @@
+#![deny(unused_must_use)]
+
 use num_bigint::{BigUint, RandBigInt};
 use rand::thread_rng;
 
@@ -5,21 +7,21 @@ use rand::thread_rng;
 pub struct ChaumPedersen {
     pub p: BigUint,
     pub q: BigUint,
-    pub alpha: BigUint,
-    pub beta: BigUint
+    pub g: BigUint,
+    pub h: BigUint
 }
 
 impl ChaumPedersen {
     pub fn generate_pair(&self, exponent: &BigUint) -> (BigUint, BigUint) {
-        return (self.alpha.modpow(exponent, &self.p), self.beta.modpow(exponent, &self.p));
+        (self.g.modpow(exponent, &self.p), self.h.modpow(exponent, &self.p))
     }
 
     pub fn generate_q_random(&self) -> BigUint {
-        return thread_rng().gen_biguint_below(&self.q);
+        thread_rng().gen_biguint_below(&self.q)
     }
 
     pub fn solve(&self, k: &BigUint, c: &BigUint, x: &BigUint) -> BigUint {
-        return if *k >= c * x {
+        if *k >= c * x {
             (k - c * x) % &self.q
         } else {
             &self.q - (c * x - k) % &self.q
@@ -27,16 +29,16 @@ impl ChaumPedersen {
     }
 
     pub fn verify(&self, r1: &BigUint, r2: &BigUint, y1: &BigUint, y2: &BigUint, c: &BigUint, s: &BigUint) -> Result<(), &str> {
-        let (alpha_power_s, beta_power_s) = self.generate_pair(s);
-        let calculated_r1 = (alpha_power_s * y1.modpow(c, &self.p)) % &self.p;
+        let (g_power_s, h_power_s) = self.generate_pair(s);
+        let calculated_r1 = (g_power_s * y1.modpow(c, &self.p)) % &self.p;
         if *r1 != calculated_r1 {
             return Err("r1 value does not match");
         }
-        let calculated_r2 = (beta_power_s * y2.modpow(c, &self.p)) % &self.p;
+        let calculated_r2 = (h_power_s * y2.modpow(c, &self.p)) % &self.p;
         if *r2 != calculated_r2 {
             return Err("r2 value does not match");
         }
-        return Ok(());
+        Ok(())
     }
 }
 
@@ -51,8 +53,8 @@ mod tests {
         let cp = ChaumPedersen {
             p: BigUint::from(23u32),
             q: BigUint::from(11u32),
-            alpha: BigUint::from(4u32),
-            beta: BigUint::from(9u32)
+            g: BigUint::from(4u32),
+            h: BigUint::from(9u32)
         };
 
         let x = BigUint::from(6u32);
@@ -74,8 +76,8 @@ mod tests {
         let cp = ChaumPedersen {
             p: BigUint::from(23u32),
             q: BigUint::from(11u32),
-            alpha: BigUint::from(4u32),
-            beta: BigUint::from(9u32)
+            g: BigUint::from(4u32),
+            h: BigUint::from(9u32)
         };
         let x = BigUint::from(6u32);
         let k = BigUint::from(7u32);
@@ -97,8 +99,8 @@ mod tests {
         let cp = ChaumPedersen {
             p: BigUint::from(23u32),
             q: BigUint::from(11u32),
-            alpha: BigUint::from(4u32),
-            beta: BigUint::from(9u32)
+            g: BigUint::from(4u32),
+            h: BigUint::from(9u32)
         };
         let x = BigUint::from(6u32);
         let k = cp.generate_q_random();
@@ -133,9 +135,9 @@ mod tests {
         let cp = ChaumPedersen {
             p: p.clone(),
             q: q.clone(),
-            alpha: g.clone(),
+            g: g.clone(),
             // alpha^i is also a generator
-            beta: g.modpow(&generate_random(&q), &p)
+            h: g.modpow(&generate_random(&q), &p)
         };
         let x = generate_random(&cp.q);
         let k = cp.generate_q_random();

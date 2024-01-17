@@ -1,18 +1,26 @@
 syntax = "proto3";
-package zkp_auth;
-
+package zkp_auth;  // TODO rename to proto
 
 /*
- * Prover registers with the verifier by sending across the public parameters and its y1 and y2 values.
+ * Ask the server for the public parameters.
+ */
+message ParamsRequest {
+}
+
+message ParamsResponse {
+    bytes p = 1;
+    bytes q = 2;
+    bytes g = 3;
+    bytes h = 4;
+}
+
+/*
+ * Prover registers with the verifier by sending across its y1 and y2 values.
  */
 message RegisterRequest {
     string user = 1;
-    bytes p = 2;
-    bytes q = 3;
-    bytes alpha = 4;
-    bytes beta = 5;
-    bytes y1 = 6;
-    bytes y2 = 7;
+    bytes y1 = 2;
+    bytes y2 = 3;
 }
 
 message RegisterResponse {
@@ -47,6 +55,7 @@ message AuthenticationAnswerResponse {
 }
 
 service Auth {
+    rpc GetParams(ParamsRequest) returns (ParamsResponse) {}
     rpc Register(RegisterRequest) returns (RegisterResponse) {}
     rpc CreateAuthenticationChallenge(AuthenticationChallengeRequest) returns (AuthenticationChallengeResponse) {}
     rpc VerifyAuthentication(AuthenticationAnswerRequest) returns (AuthenticationAnswerResponse) {}
