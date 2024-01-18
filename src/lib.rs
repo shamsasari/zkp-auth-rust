@@ -3,7 +3,7 @@
 use num_bigint::{BigUint, RandBigInt};
 use rand::thread_rng;
 
-#[derive(Debug, Default)]  // TODO Shouldn't really be Default
+#[derive(Debug)]
 pub struct ChaumPedersen {
     pub p: BigUint,
     pub q: BigUint,
@@ -20,7 +20,7 @@ impl ChaumPedersen {
         thread_rng().gen_biguint_below(&self.q)
     }
 
-    pub fn solve(&self, k: &BigUint, c: &BigUint, x: &BigUint) -> BigUint {
+    pub fn solve_challenge(&self, k: &BigUint, c: &BigUint, x: &BigUint) -> BigUint {
         if *k >= c * x {
             (k - c * x) % &self.q
         } else {
@@ -28,7 +28,7 @@ impl ChaumPedersen {
         }
     }
 
-    pub fn verify(&self, r1: &BigUint, r2: &BigUint, y1: &BigUint, y2: &BigUint, c: &BigUint, s: &BigUint) -> Result<(), &str> {
+    pub fn verify_solution(&self, r1: &BigUint, r2: &BigUint, y1: &BigUint, y2: &BigUint, c: &BigUint, s: &BigUint) -> Result<(), &str> {
         let (g_power_s, h_power_s) = self.generate_pair(s);
         let calculated_r1 = (g_power_s * y1.modpow(c, &self.p)) % &self.p;
         if *r1 != calculated_r1 {
@@ -64,10 +64,10 @@ mod tests {
         let (y1, y2) = cp.generate_pair(&x);
         let (r1, r2) = cp.generate_pair(&k);
 
-        let s = cp.solve(&k, &c, &x);
+        let s = cp.solve_challenge(&k, &c, &x);
         assert_eq!(s, BigUint::from(5u32));
 
-        let result = cp.verify(&r1, &r2, &y1, &y2, &c, &s);
+        let result = cp.verify_solution(&r1, &r2, &y1, &y2, &c, &s);
         assert!(result.is_ok());
     }
 
@@ -88,9 +88,9 @@ mod tests {
 
         // Man in the middle tries to intercept with a fake secret
         let fake_x = BigUint::from(9u32);
-        let fake_s = cp.solve(&k, &c, &fake_x);
+        let fake_s = cp.solve_challenge(&k, &c, &fake_x);
 
-        let result = cp.verify(&r1, &r2, &y1, &y2, &c, &fake_s);
+        let result = cp.verify_solution(&r1, &r2, &y1, &y2, &c, &fake_s);
         assert!(result.is_err());
     }
 
@@ -109,8 +109,8 @@ mod tests {
         let (y1, y2) = cp.generate_pair(&x);
         let (r1, r2) = cp.generate_pair(&k);
 
-        let s = cp.solve(&k, &c, &x);
-        let result = cp.verify(&r1, &r2, &y1, &y2, &c, &s);
+        let s = cp.solve_challenge(&k, &c, &x);
+        let result = cp.verify_solution(&r1, &r2, &y1, &y2, &c, &s);
         assert!(result.is_ok());
     }
 
@@ -146,8 +146,8 @@ mod tests {
         let (y1, y2) = cp.generate_pair(&x);
         let (r1, r2) = cp.generate_pair(&k);
 
-        let s = cp.solve(&k, &c, &x);
-        let result = cp.verify(&r1, &r2, &y1, &y2, &c, &s);
+        let s = cp.solve_challenge(&k, &c, &x);
+        let result = cp.verify_solution(&r1, &r2, &y1, &y2, &c, &s);
         assert!(result.is_ok());
     }
 

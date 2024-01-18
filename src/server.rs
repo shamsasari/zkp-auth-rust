@@ -40,7 +40,7 @@ struct UserInfo {
 
 impl UserInfo {
     fn verify<'a>(&'a self, cp: &'a ChaumPedersen, s: &BigUint) -> Result<(), &str> {
-        cp.verify(&self.r1, &self.r2, &self.y1, &self.y2, &self.c, s)
+        cp.verify_solution(&self.r1, &self.r2, &self.y1, &self.y2, &self.c, s)
     }
 }
 
