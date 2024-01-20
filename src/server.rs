@@ -5,7 +5,8 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::net::SocketAddr;
 use std::process::exit;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
+use std::time::SystemTime;
 
 use num::Num;
 use num_bigint::{BigUint, ParseBigIntError};
@@ -27,28 +28,39 @@ pub mod zkp_auth {
     tonic::include_proto!("zkp_auth");
 }
 
-#[derive(Debug, Default)]
-struct UserInfo {
+#[derive(Debug)]
+struct User {
     user_name: String,
     y1: BigUint,
-    y2: BigUint,
+    y2: BigUint
+}
+
+#[derive(Debug)]
+struct InProgressAuthentication {
+    user: Arc<User>,
     r1: BigUint,
     r2: BigUint,
     c: BigUint,
-    session_id: String
+    time_stamp: SystemTime  // TODO Use this to delete old entries
 }
 
-impl UserInfo {
+impl InProgressAuthentication {
     fn verify<'a>(&'a self, cp: &'a ChaumPedersen, s: &BigUint) -> Result<(), &str> {
-        cp.verify_solution(&self.r1, &self.r2, &self.y1, &self.y2, &self.c, s)
+        cp.verify_solution(&self.r1, &self.r2, &self.user.y1, &self.user.y2, &self.c, s)
     }
 }
 
 #[derive(Debug)]
 struct AuthImpl {
     cp: ChaumPedersen,
-    user_infos: Mutex<HashMap<String, UserInfo>>,
-    auth_ids: Mutex<HashMap<String, String>>
+    users: Mutex<HashMap<String, Arc<User>>>,
+    in_progress_authentications: Mutex<HashMap<String, InProgressAuthentication>>,
+}
+
+impl AuthImpl {
+    fn new(cp: ChaumPedersen) -> Self {
+        AuthImpl { cp, users: Mutex::default(), in_progress_authentications: Mutex::default() }
+    }
 }
 
 #[tonic::async_trait]
@@ -68,13 +80,19 @@ impl Auth for AuthImpl {
         println!("Processing register request: {:?}", request);
         let request = request.into_inner();
 
-        let mut user_info = UserInfo::default();
-        user_info.user_name = request.user;
-        user_info.y1 = request.y1.deserialise_big_uint();
-        user_info.y2 = request.y2.deserialise_big_uint();
+        let mut users = self.users.lock().unwrap();
+        if users.contains_key(&request.user_name) {
+            return Err(Status::new(Code::AlreadyExists, format!("User name '{}' already exists", &request.user_name)));
+        }
 
-        let mut user_infos = self.user_infos.lock().unwrap();
-        user_infos.insert(user_info.user_name.clone(), user_info);
+        users.insert(
+            request.user_name.clone(),
+            Arc::from(User {
+                user_name: request.user_name,
+                y1: request.y1.deserialise_big_uint(),
+                y2: request.y2.deserialise_big_uint()
+            })
+        );
 
         Ok(Response::new(RegisterResponse { }))
     }
@@ -83,20 +101,27 @@ impl Auth for AuthImpl {
         println!("Processing authentication challenge request: {:?}", request);
         let request = request.into_inner();
 
-        let mut user_infos = self.user_infos.lock().unwrap();
-        let user_info = user_infos
-            .get_mut(&request.user)
-            .ok_or_else(|| Status::new(Code::NotFound, format!("User {} not found", &request.user)))?;
+        let users = self.users.lock().unwrap();
+        let user = users
+            .get(&request.user_name)
+            .ok_or_else(|| Status::new(Code::NotFound, format!("User '{}' not found", &request.user_name)))?;
 
-        user_info.r1 = request.r1.deserialise_big_uint();
-        user_info.r2 = request.r2.deserialise_big_uint();
-        user_info.c = self.cp.generate_q_random();
+        let c = self.cp.generate_q_random();
+        let c_serialised = c.serialise();
 
-        let auth_id = Uuid::new_v4().to_string();
-        self.auth_ids.lock().unwrap().insert(auth_id.clone(), request.user);
+        let authentication = InProgressAuthentication {
+            user: Arc::clone(user),
+            r1: request.r1.deserialise_big_uint(),
+            r2: request.r2.deserialise_big_uint(),
+            c,
+            time_stamp: SystemTime::now()
+        };
+
+        let correlation_id = Uuid::new_v4().to_string();
+        self.in_progress_authentications.lock().unwrap().insert(correlation_id.clone(), authentication);
         return Ok(Response::new(AuthenticationChallengeResponse {
-            auth_id,
-            c: user_info.c.serialise()
+            correlation_id,
+            c: c_serialised
         }))
     }
 
@@ -104,32 +129,17 @@ impl Auth for AuthImpl {
         println!("Processing authentication verify request: {:?}", request);
         let request = request.into_inner();
 
-        let auth_ids = self.auth_ids.lock().unwrap();
-        let user_name = auth_ids
-            .get(&request.auth_id)
-            .ok_or_else(|| Status::new(Code::Unauthenticated, "User not authenticated"))?;
+        let mut in_progress_authentications = self.in_progress_authentications.lock().unwrap();
+        let authentication = in_progress_authentications
+            .remove(&request.correlation_id)
+            .ok_or_else(|| Status::new(Code::NotFound, "Unknown authentication correlation ID"))?;
 
-        let user_infos = self.user_infos.lock().unwrap();
-        let user_info = user_infos
-            .get(user_name.as_str())
-            .ok_or_else(|| Status::new(Code::Unauthenticated, "User not authenticated"))?;
-
-        user_info.verify(&self.cp, &request.s.deserialise_big_uint())
+        authentication.verify(&self.cp, &request.s.deserialise_big_uint())
             .map_err(|msg| Status::new(Code::PermissionDenied, msg))?;
 
         Ok(Response::new(AuthenticationAnswerResponse {
             session_id: Uuid::new_v4().to_string()
         }))
-    }
-}
-
-impl AuthImpl {
-    fn new(cp: ChaumPedersen) -> Self {
-        AuthImpl {
-            cp,
-            user_infos: Mutex::default(),
-            auth_ids: Mutex::default()
-        }
     }
 }
 

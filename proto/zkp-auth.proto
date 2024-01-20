@@ -18,7 +18,7 @@ message ParamsResponse {
  * Prover registers with the verifier by sending across its y1 and y2 values.
  */
 message RegisterRequest {
-    string user = 1;
+    string user_name = 1;
     bytes y1 = 2;
     bytes y2 = 3;
 }
@@ -31,13 +31,13 @@ message RegisterResponse {
  *  Verifier sends the challenge back.
  */
 message AuthenticationChallengeRequest {
-    string user = 1;
+    string user_name = 1;
     bytes r1 = 2;
     bytes r2 = 3;
 }
 
 message AuthenticationChallengeResponse {
-    string auth_id = 1;
+    string correlation_id = 1;
     bytes c = 2;
 }
 
@@ -46,7 +46,7 @@ message AuthenticationChallengeResponse {
  * Verifier sends back a session ID if the solution is correct.
  */
 message AuthenticationAnswerRequest {
-    string auth_id = 1;
+    string correlation_id = 1;
     bytes s = 2;
 }
 
