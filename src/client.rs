@@ -84,11 +84,11 @@ async fn register(cp: &ChaumPedersen, user_name: &String, password: &BigUint, cl
     let (y1, y2) = cp.generate_pair(&password);
 
     client.register(RegisterRequest {
-        user: user_name.clone(),
+        user_name: user_name.clone(),
         y1: y1.serialise(),
         y2: y2.serialise()
     }).await.unwrap_or_else(|status| {
-        eprintln!("Unable to register: {}", status);
+        eprintln!("Unable to register: {}", status.message());
         exit(1);
     });
 
@@ -100,7 +100,7 @@ async fn authenticate(cp: &ChaumPedersen, user_name: &String, password: &BigUint
     let (r1, r2) = cp.generate_pair(&k);
 
     let response = client.create_authentication_challenge(AuthenticationChallengeRequest {
-        user: user_name.to_string(),
+        user_name: user_name.to_string(),
         r1: r1.serialise(),
         r2: r2.serialise()
     }).await.unwrap_or_else(|status| {
@@ -108,12 +108,12 @@ async fn authenticate(cp: &ChaumPedersen, user_name: &String, password: &BigUint
         exit(1);
     }).into_inner();
 
-    let auth_id = response.auth_id;
+    let correlation_id = response.correlation_id;
     let c = response.c.deserialise_big_uint();
 
     let s = cp.solve_challenge(&k, &c, &password);
     let response = client.verify_authentication(AuthenticationAnswerRequest {
-        auth_id,
+        correlation_id,
         s: s.serialise()
     }).await.unwrap_or_else(|status| {
         eprintln!("Authentication failed: {}", status.message());
